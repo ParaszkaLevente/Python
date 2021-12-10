@@ -1,0 +1,45 @@
+import datetime
+import re
+
+import pymongo
+from flask import Flask, request, Response
+
+server = pymongo.MongoClient("mongodb://localhost:27017/")
+database = server["Locipulzusok"]
+table = database[datetime.date.today().strftime("%Y.%m.%d")]
+
+app = Flask(__name__)
+
+
+@app.route('/', methods=['POST', 'GET'])
+def homepage():
+    # ha a request tipusa "GET" es a kapott adat egy üres bytesorozat
+    if request.method == "GET" and request.data == b"":
+        # valaszoljon 400-as responsezal
+        return Response(status=400)
+    try:
+        req = request.form.to_dict()
+        if database.list_collection_names():
+            database.drop_collection(datetime.date.today().strftime("%Y.%m.%d"))
+        checkddict = {}
+        for k, v in zip(req.keys(), req.values()):
+            if re.match(r"(\d\d:\d\d)", k) and re.match(r"(\d+)", v):
+                hour = int(k.split(":")[0])
+                minute = int(k.split(":")[1])
+                if 0 <= hour <= 23 and 0 <= minute <= 59 and 0 < int(v) <= 150:
+                    checkddict[k] = v
+                else:
+                    return Response(status=403)
+            else:
+                return Response(status=403)
+
+        table.insert_one(checkddict)
+
+    except:
+        return Response(status=403)
+
+    return Response(status=200)
+
+
+if __name__ == "__main__":
+    app.run()
